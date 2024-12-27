@@ -265,6 +265,10 @@ create_br() {
 
 clear_no_interface_connection() {
     echo "Clean up connections with no managing interfaces"
+    echo "All existing connections:"
+    echo $SPLIT_LINE
+    nmcli connection show
+    echo $SPLIT_LINE
     all_conns=$(nmcli -t -f NAME,DEVICE connection show)
     while IFS=: read -r name device; do
         if [ -z "$device" ]; then
@@ -276,7 +280,7 @@ clear_no_interface_connection() {
                 echo "Failed to delete connection \"$name\"."
             fi
         fi
-    done <<< "$connections"
+    done <<< "$all_conns"
 }
 
 add_phy_interface_to_br() {
