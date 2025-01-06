@@ -4,6 +4,7 @@ SPLIT_LINE="--------------------------------------------------------------------
 RDMA_ROOT_DIR="/home/rdma"
 UPDATE_RDMA_CORE="true"
 UPDATE_RIB_DRV="true"
+UPDATE_RQOS="true"
 UPDATE_RIB_CLI="true"
 UPDATE_RFT="true"
 UPDATE_PERFTEST="false"
@@ -16,13 +17,14 @@ TIME_STR=$(date +"%Y%m%d_%H%M%S")
 print_help() {
     cat << EOF
 $SPLIT_LINE
-To download RDMA software (rdma-core, rib_driver, rib_cli, rft, perftest) in the same directory, such as $RDMA_ROOT_DIR.
-Then compile RDMA software. It will be backuped if old software exist, with a directory name appended by a time string.
+To download RDMA software (rdma-core, rib_driver, rqos, rib_cli, rft, perftest) in the same directory, 
+such as $RDMA_ROOT_DIR. Then compile RDMA software. It will be backuped if old software exist, 
+with a directory name appended by a time string.
 
 Usage:
     $0 -h or $0 help or $0 --help
     or
-    $0 rdma_root=<rdma root path> rdma_core=<if update rdma-core> rib_drv=<if update rib_driver> \
+    $0 rdma_root=<rdma root path> rdma_core=<if update rdma-core> rib_drv=<if update rib_driver> rqos=<if update rqos> \
 rib_cli=<if update rib_driver> rft=<if update rft> perftest=<if update perftest>
 
 Arguments:
@@ -30,6 +32,7 @@ Arguments:
                 Default is $RDMA_ROOT_DIR
     rdma_core:  whether to update rdma-core software (true/false), default is true
     rib_drv:    whether to update rib_driver software (true/false), default is true
+    rqos:       whether to update rqos software (true/false), default is true
     rib_cli:    whether to update rib_cli software (true/false), default is true
     rft:        whether to update rft software (true/false), default is true
     perftest:   whether update perftest software (true/false), default is true
@@ -42,7 +45,7 @@ Examples:
         bash $0 rdma_root=/home/test/rdma/
 
     update only rdma-core, with the RDMA root path as default $RDMA_ROOT_DIR:
-        bash $0 rib_drv=false rib_cli=false rft=false perftest=false
+        bash $0 rib_drv=false rqos=false rib_cli=false rft=false perftest=false
 
 $SPLIT_LINE
 EOF
@@ -59,6 +62,9 @@ do
 			;;
 		rib_drv=*)
 			UPDATE_RIB_DRV="${arg#*=}"
+			;;
+		rqos=*)
+			UPDATE_RQOS="${arg#*=}"
 			;;
 		rib_cli=*)
 			UPDATE_RIB_CLI="${arg#*=}"
@@ -123,6 +129,46 @@ update_rib_drv() {
 		echo "Compile rib_driver failed!"
 	fi
 	echo $SPLIT_LINE
+}
+
+update_rqos() {
+    echo $SPLIT_LINE
+    rqos_path="$RDMA_ROOT_DIR/rqos"
+    bak_rqos_path="$RDMA_ROOT_DIR/rqos_bak_$TIME_STR"
+
+    if ! command -v expect &> /dev/null; then
+        echo "Expect is not installed. Installing expect..."
+        sudo yum install -y expect
+    fi
+
+    if [ -d "$rqos_path" ]; then
+        echo "Backup existing rqos directory ..."
+        mv $rqos_path $bak_rqos_path
+    fi
+    
+    cd $RDMA_ROOT_DIR
+    echo "Download new rqos ..."
+    git clone http://$USERNAME:$PASSWD@$GITLAB_ADDR/$PROJECT/rqos.git
+    echo "Compile new rqos ..."
+    cd $RDMA_ROOT_DIR/rqos
+
+    expect <<EOF
+        spawn git submodule update --init --recursive
+        expect "Username for 'http://$GITLAB_ADDR':"
+        send "$USERNAME\r"
+        expect "Password for 'http://$USERNAME@$GITLAB_ADDR':"
+        send "$PASSWD\r"
+		expect "Submodule path 'rdriver': checked out"
+        interact
+EOF
+    make && make install
+    if [ $? -eq 0 ]; then
+        echo "Compile rqos success!"
+    else
+        echo "Compile rqos failed!"
+    fi
+
+    echo $SPLIT_LINE
 }
 
 update_rib_cli() {
@@ -200,6 +246,9 @@ main() {
 	fi
 	if [ $UPDATE_RIB_DRV = "true" ]; then
 		update_rib_drv
+	fi
+	if [ $UPDATE_RQOS = "true" ]; then
+		update_rqos
 	fi
 	if [ $UPDATE_RIB_CLI = "true" ]; then
 		update_rib_cli

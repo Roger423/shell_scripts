@@ -5,6 +5,7 @@ ACTION="set"
 RDMA_ROOT_DIR="/home/rdma"
 SET_RDMA_CORE="true"
 SET_RIB_DRV="true"
+SET_RQOS="true"
 SET_RIB_CLI="true"
 SET_RFT="true"
 SET_PERFTEST="true"
@@ -22,7 +23,7 @@ variables will replace the existing RDMA environment variable settings.
 Usage:
     $0 -h or $0 help or $0 --help
     or
-    $0 rdma_root=<rdma root path> rdma_core=<if set rdma-core env> rib_drv=<if set rib_driver env> \
+    $0 rdma_root=<rdma root path> rdma_core=<if set rdma-core env> rib_drv=<if set rib_driver env> rqos=<if set rqos env> \
 rib_cli=<if set rib_driver env> rft=<if set rft env> perftest=<if set perftest env>
 
 Arguments:
@@ -31,6 +32,7 @@ Arguments:
 	            Default is $RDMA_ROOT_DIR
     rdma_core:  whether to set the environment variables of rdma-core software (true/false), default is true
     rib_drv:    whether to set the environment variables of rib_driver software (true/false), default is true
+    rqos:       whether to set the environment variables of rqos software (true/false), default is true
     rib_cli:    whether to set the environment variables of rib_cli software (true/false), default is true
     rft:        whether to set the environment variables of rft software (true/false), default is true
     perftest:   whether to set the environment variables of perftest software (true/false), default is true
@@ -43,7 +45,7 @@ Examples:
         bash $0 rdma_root=/home/test/rdma/
 
     Set environment variables for only rdma-core, with the RDMA root path as default $RDMA_ROOT_DIR:
-        bash $0 rib_drv=false rib_cli=false rft=false perftest=false
+        bash $0 rib_drv=false rqos=false rib_cli=false rft=false perftest=false
 	
 	Clear environment variables of RDMA:
 		bash $0 action=clear
@@ -65,6 +67,9 @@ do
 			;;
 		rib_drv=*)
 			SET_RIB_DRV="${arg#*=}"
+			;;
+		rqos=*)
+			SET_RQOS="${arg#*=}"
 			;;
 		rib_cli=*)
 			SET_RIB_CLI="${arg#*=}"
@@ -129,6 +134,14 @@ set_rib_drv_env() {
 	RIB_DRV_PATH=$RIB_DIR/rib.ko
     if ! grep -q "export RIB_DRV_PATH=$RIB_DRV_PATH" "$SET_ENV_FILE"; then
         echo "export RIB_DRV_PATH=$RIB_DRV_PATH" >> "$SET_ENV_FILE"
+    fi
+}
+
+set_rqos_env() {
+	RQOS_DIR=$RDMA_ROOT_DIR/rqos
+	RQOS_PATH=$RQOS_DIR/rqos.ko
+    if ! grep -q "export RQOS_PATH=$RQOS_PATH" "$SET_ENV_FILE"; then
+        echo "export RQOS_PATH=$RQOS_PATH" >> "$SET_ENV_FILE"
     fi
 }
 
@@ -197,6 +210,11 @@ main() {
 		echo $SPLIT_LINE
 		echo "Set rib dirver env ..."
 		set_rib_drv_env
+	fi
+	if [ $SET_RQOS = "true" ]; then
+		echo $SPLIT_LINE
+		echo "Set rqos env ..."
+		set_rqos_env
 	fi
 	if [ $SET_RIB_CLI = "true" ]; then
 		echo $SPLIT_LINE
