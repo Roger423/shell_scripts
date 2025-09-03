@@ -105,27 +105,49 @@ set_rdma_root() {
 	fi
 }
 
+set_lib_path() {
+    if ! grep -q "export LIBRARY_PATH=\$LIBRARY_PATH:\$RDMA_CORE/lib" "$SET_ENV_FILE"; then
+        sed -i "/export RDMA_CORE=/a export LIBRARY_PATH=\$LIBRARY_PATH:\$RDMA_CORE/lib" "$SET_ENV_FILE"
+    fi
+}
+
+set_ld_lib_path() {
+    if ! grep -q "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$RDMA_CORE/lib" "$SET_ENV_FILE"; then
+        sed -i "/export LIBRARY_PATH=/a export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$RDMA_CORE/lib" "$SET_ENV_FILE"
+    fi
+}
+
+set_pkg_config_path() {
+    if ! grep -q "export PKG_CONFIG_PATH=\$RDMA_CORE/lib/pkgconfig:\$PKG_CONFIG_PATH" "$SET_ENV_FILE"; then
+        sed -i "/export LD_LIBRARY_PATH=/a export PKG_CONFIG_PATH=\$RDMA_CORE/lib/pkgconfig:\$PKG_CONFIG_PATH" \
+		"$SET_ENV_FILE"
+    fi
+}
+
+# set_c_include_path() {
+#     if ! grep -q "export C_INCLUDE_PATH=\$C_INCLUDE_PATH:\$RDMA_CORE/include" "$SET_ENV_FILE"; then
+#         sed -i "/export PKG_CONFIG_PATH=/a export C_INCLUDE_PATH=\$C_INCLUDE_PATH:\$RDMA_CORE/include" "$SET_ENV_FILE"
+#     fi
+# }
+
+# set_cplus_include_path() {
+#     if ! grep -q "export CPLUS_INCLUDE_PATH=\$CPLUS_INCLUDE_PATH:\$RDMA_CORE/include" "$SET_ENV_FILE"; then
+#         sed -i "/export C_INCLUDE_PATH=/a export CPLUS_INCLUDE_PATH=\$CPLUS_INCLUDE_PATH:\$RDMA_CORE/include" \
+# 		"$SET_ENV_FILE"
+#     fi
+# }
+
 set_rdma_core_env() {
     if ! grep -q "export RDMA_CORE=\$RDMA_ROOT/rdma-core/build" "$SET_ENV_FILE"; then
         sed -i "/export RDMA_ROOT=/a export RDMA_CORE=\$RDMA_ROOT/rdma-core/build" "$SET_ENV_FILE"
     fi
-    if ! grep -q "export LIBRARY_PATH=\$LIBRARY_PATH:\$RDMA_CORE/lib" "$SET_ENV_FILE"; then
-        sed -i "/export RDMA_CORE=/a export LIBRARY_PATH=\$LIBRARY_PATH:\$RDMA_CORE/lib" "$SET_ENV_FILE"
-    fi
-    if ! grep -q "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$RDMA_CORE/lib" "$SET_ENV_FILE"; then
-        sed -i "/export LIBRARY_PATH=/a export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$RDMA_CORE/lib" "$SET_ENV_FILE"
-    fi
-    if ! grep -q "export PKG_CONFIG_PATH=\$RDMA_CORE/lib/pkgconfig:\$PKG_CONFIG_PATH" "$SET_ENV_FILE"; then
-        sed -i "/export LD_LIBRARY_PATH=/a export PKG_CONFIG_PATH=\$RDMA_CORE/lib/pkgconfig:\$PKG_CONFIG_PATH" "$SET_ENV_FILE"
-    fi
-    if ! grep -q "export C_INCLUDE_PATH=\$C_INCLUDE_PATH:\$RDMA_CORE/include" "$SET_ENV_FILE"; then
-        sed -i "/export PKG_CONFIG_PATH=/a export C_INCLUDE_PATH=\$C_INCLUDE_PATH:\$RDMA_CORE/include" "$SET_ENV_FILE"
-    fi
-    if ! grep -q "export CPLUS_INCLUDE_PATH=\$CPLUS_INCLUDE_PATH:\$RDMA_CORE/include" "$SET_ENV_FILE"; then
-        sed -i "/export C_INCLUDE_PATH=/a export CPLUS_INCLUDE_PATH=\$CPLUS_INCLUDE_PATH:\$RDMA_CORE/include" "$SET_ENV_FILE"
-    fi
+	set_lib_path
+	set_ld_lib_path
+	set_pkg_config_path
+	# set_c_include_path
+	# set_cplus_include_path
     if ! grep -q "export PATH=\$RDMA_CORE/bin:\$PATH" "$SET_ENV_FILE"; then
-		sed -i "/export CPLUS_INCLUDE_PATH=/a export PATH=\$RDMA_CORE/bin:\$PATH" "$SET_ENV_FILE"
+		sed -i "/export LD_LIBRARY_PATH=/a export PATH=\$RDMA_CORE/bin:\$PATH" "$SET_ENV_FILE"
     fi
 }
 

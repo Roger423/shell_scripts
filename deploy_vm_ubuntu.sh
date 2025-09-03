@@ -41,28 +41,32 @@ XML_FILE="$VM_NAME.xml"
 BRIDGE_NAME="br0"
 
 check_libvirt_install() {
-    echo "Check libvirt-client installation"
-    sudo yum install libvirt libvirt-daemon -y
-    if rpm -q libvirt-client &> /dev/null; then 
-        echo "libvirt-client is already installed" 
-    else 
-        echo "libvirt-client is not installed, installing now..." 
-        sudo dnf install -y libvirt-client 
-        if [ $? -eq 0 ]; then 
-            echo "libvirt-client installation successful" 
-        else 
-            echo "libvirt-client installation failed" 
-        fi 
+    echo "Check libvirt installation"
+    if dpkg -l | grep -q libvirt-daemon-system; then
+        echo "libvirt-daemon-system is already installed"
+    else
+        echo "libvirt-daemon-system is not installed, installing now..."
+        sudo apt update
+        sudo apt install -y libvirt-daemon-system libvirt-clients
+        if [ $? -eq 0 ]; then
+            echo "libvirt installation successful"
+        else
+            echo "libvirt installation failed"
+            exit 1
+        fi
     fi
     sudo systemctl enable libvirtd
     sudo systemctl start libvirtd
 }
 
-stop_firewall_and_selinux() {
-    echo "Stop firewall and Selinux"
-    systemctl stop firewalld.service
-    systemctl disable firewalld.service
-    setenforce 0
+stop_firewall() {
+    echo "Stop ufw firewall"
+    if sudo ufw status | grep -q "Status: active"; then
+        sudo ufw disable
+        echo "ufw firewall disabled"
+    else
+        echo "ufw firewall is already disabled"
+    fi
 }
 
 check_iommu() {
@@ -71,6 +75,7 @@ check_iommu() {
         echo "IOMMU is enabled in /etc/default/grub"
     else
         echo "IOMMU is not enabled in /etc/default/grub, please enable iommu in /etc/default/grub first"
+        echo "Add 'intel_iommu=on' or 'amd_iommu=on' to GRUB_CMDLINE_LINUX_DEFAULT and run 'sudo update-grub'"
         exit 1
     fi
 }
@@ -83,18 +88,16 @@ check_python3() {
         echo "Python version is $python3_ver, which is sufficient."
     else
         echo "Python version is $python3_ver, which is not sufficient. Installing Python 3.8..."
-        sudo dnf install -y python38
+        sudo apt update
+        sudo apt install -y python3.8 python3.8-dev python3-pip
         if [ $? -eq 0 ]; then
             echo "Python 3.8 installation successful."
-
-            # 使用 alternatives 设置默认的 python3 为 python3.8
-            sudo alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
-            sudo alternatives --set python3 /usr/bin/python3.8
-            sudo ln -s /usr/bin/pip3.8 /usr/bin/pip3
+            sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
             new_python3_ver=$(python3 --version 2>&1 | awk '{print $2}')
             echo "Default Python version is now $new_python3_ver."
         else
             echo "Python 3.8 installation failed."
+            exit 1
         fi
     fi
 }
@@ -106,36 +109,34 @@ check_qemu() {
     if [[ $(echo -e "$qemu_ver\n$req_ver" | sort -V | head -n1) == "$req_ver" ]]; then
         echo "QEMU version is $qemu_ver, which is sufficient."
     else
-        echo "QEMU version is $qemu_ver, which is not sufficient. Downloading and installing QEMU $QEMU_VERSION..."
-        dnf groupinstall "Development Tools" -y
-        dnf install pkgconfig glib2-devel -y
-        dnf install pixman-devel -y
-        pip3 install meson ninja -i https://pypi.tuna.tsinghua.edu.cn/simple
-        pip3 install --upgrade meson -i https://pypi.tuna.tsinghua.edu.cn/simple
-        pip3 install pyelftools -i https://pypi.tuna.tsinghua.edu.cn/simple
+        echo "QEMU version is $qemu_ver, which is not sufficient. Installing QEMU $QEMU_VERSION..."
+        sudo apt update
+        sudo apt install -y build-essential zlib1g-dev libglib2.0-dev libpixman-1-dev python3-pip git ninja-build
+        pip3 install meson pyelftools
         cd /opt/
         wget https://download.qemu.org/qemu-$QEMU_VERSION.tar.xz
         tar -xf qemu-$QEMU_VERSION.tar.xz
         cd qemu-$QEMU_VERSION
         ./configure --target-list=x86_64-softmmu --enable-debug --enable-debug-info --enable-kvm
-        make -j
+        make -j$(nproc)
         sudo make install
         cd
         if [ $? -eq 0 ]; then
             echo "QEMU $QEMU_VERSION installation successful."
         else
             echo "QEMU $QEMU_VERSION installation failed."
+            exit 1
         fi
     fi
 }
 
 create_vm_xml_file() {
     echo "Create vm xml file"
-    if [ -f "$XML_FILE" ]; then 
+    if [ -f "$XML_FILE" ]; then
         echo "$XML_FILE already exists. please specify another vm name to create corresponding xml file"
-        exit 1	
-    else 
-        touch "$XML_FILE" 
+        exit 1
+    else
+        touch "$XML_FILE"
     fi
 }
 
@@ -259,6 +260,7 @@ create_br() {
             echo "Network bridge $BRIDGE_NAME has been created successfully."
         else
             echo "Failed to create network bridge $BRIDGE_NAME."
+            exit 1
         fi
     fi
 }
@@ -290,6 +292,7 @@ add_phy_interface_to_br() {
         echo "Add interface $PHY_INTERFACE to be a slave port of $BRIDGE_NAME successfully."
     else
         echo "Failed to add interface $PHY_INTERFACE to be a slave port of $BRIDGE_NAME."
+        exit 1
     fi
     sleep 2
 }
@@ -352,6 +355,7 @@ set_br_ip_method() {
             echo "The address method for $BRIDGE_NAME has been set to auto successfully."
         else
             echo "Failed to set the address method for $BRIDGE_NAME to auto."
+            exit 1
         fi
     fi
 }
@@ -363,7 +367,7 @@ start_vm() {
         echo "Define vm by $XML_FILE successfully."
     else
         echo "Failed to define vm by $XML_FILE."
-    exit 1
+        exit 1
     fi
     echo "Check vm list before start vm"
     virsh list --all
@@ -381,7 +385,7 @@ start_vm() {
 
 show_info() {
     echo $SPLIT_LINE
-    br_ip=$(ifconfig $BRIDGE_NAME | grep 'inet ' | awk '{print $2}')
+    br_ip=$(ip addr show $BRIDGE_NAME | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1)
     echo "VM deployed successfully"
     echo "Information of VM environment:"
     echo "IP address of host(SSH) ----> $br_ip"
@@ -396,7 +400,7 @@ main() {
     echo $SPLIT_LINE
     check_iommu
     echo $SPLIT_LINE
-    stop_firewall_and_selinux
+    stop_firewall
     echo $SPLIT_LINE
     check_libvirt_install
     echo $SPLIT_LINE

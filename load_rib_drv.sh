@@ -4,14 +4,40 @@
 # Load rib dirver and set tos default value for rib dev
 ##########################################################
 
-modprobe ib_core
-modprobe ib_uverbs
-modprobe ib_cm
-modprobe ib_umad
-modprobe iw_cm
-modprobe rdma_cm
-modprobe rdma_ucm
-modprobe virtio_net
+RIB=/home/rdma/rib_driver/rib.ko
+
+load_mods() {
+    echo "Load needed modules..."
+    modprobe ib_core
+    modprobe ib_uverbs
+    modprobe ib_cm
+    modprobe ib_umad
+    modprobe iw_cm
+    modprobe rdma_cm
+    modprobe rdma_ucm
+    modprobe virtio_net
+}
+
+remove_rib() {
+    echo "Remove rib dirver..."
+    if lsmod | grep -q rib; then
+        rmmod rib
+    fi
+}
+
+load_rib_mod() {
+    remove_rib
+    sleep 1
+    echo "Load rib driver..."
+    insmod $RIB
+    sleep 1
+}
+
+load_rdma_drv() {
+    load_mods
+    load_rib_mod
+    sleep 1
+}
 
 # Function to check if rib module is loaded
 check_rib_module() {
@@ -23,7 +49,7 @@ check_rib_module() {
 
 # Get parameters: device name and tos value
 device=${1:-all}
-tos_val=${2:-96}
+tos_val=${2:-98}
 
 # Get list of devices starting with rib
 get_devices() {
@@ -41,7 +67,7 @@ set_tos() {
     echo "TOS value of ${dev} --> ${current_tos}"
 }
 
-insmod $RIB_DRV_PATH
+load_rdma_drv
 # Check if rib module is loaded
 check_rib_module
 

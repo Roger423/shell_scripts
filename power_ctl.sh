@@ -4,7 +4,9 @@
 declare -A DEVICE_INFO
 DEVICE_INFO[m6]="192.168.64.135 sys Resnics@123"
 DEVICE_INFO[m5]="192.168.64.142 root a"
-DEVICE_INFO[s1]="192.168.64.149 admin resnics@123"
+DEVICE_INFO[s1]="192.168.64.100 root resnics@123"
+DEVICE_INFO[s2]="192.168.64.149 admin resnics@123"
+DEVICE_INFO[h1]="192.168.64.102 admin resnics@123"
 
 # 获取设备信息函数
 get_device_info() {
@@ -50,6 +52,9 @@ case $ACTION in
         ;;
     off)
         ipmitool -I lanplus -H $IP -U $USER -P $PASS power off
+        ;;
+    reset)
+        ipmitool -I lanplus -H $IP -U $USER -P $PASS power reset
         ;;
     *)
         echo "Invalid action: $ACTION"
